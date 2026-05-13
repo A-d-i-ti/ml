@@ -1,87 +1,266 @@
-# Decision Tree Classification - General Template
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.naive_bayes import GaussianNB, CategoricalNB
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    confusion_matrix,
+    roc_auc_score
+)
+
+from sklearn.preprocessing import (
+    LabelEncoder,
+    OrdinalEncoder,
+    label_binarize
+)
 
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.tree import DecisionTreeClassifier, plot_tree
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
-import matplotlib.pyplot as plt
 
-# -----------------------------
-# 1. Load your dataset
-# -----------------------------
-# Option 1: Load CSV file
-data = pd.read_csv("your_dataset.csv")
+# Dataset
+data = [
+    ["Low", "Poor", "Bad", "Yes", "Fail"],
+    ["High", "Good", "Good", "No", "Pass"],
+    ["Medium", "Good", "Good", "Yes", "Pass"],
+    ["Low", "Poor", "Bad", "No", "Fail"],
+    ["High", "Good", "Bad", "No", "Pass"],
+    ["Medium", "Poor", "Good", "Yes", "Fail"],
+    ["High", "Good", "Good", "Yes", "Pass"],
+    ["Low", "Good", "Bad", "Yes", "Fail"],
+    ["Medium", "Good", "Good", "No", "Pass"],
+    ["High", "Poor", "Good", "No", "Pass"]
+]
 
-# Option 2: Create data manually
-# data = pd.DataFrame({
-#     "Age": [22, 25, 47, 52, 46, 56],
-#     "Salary": [20000, 25000, 50000, 60000, 52000, 70000],
-#     "Purchased": ["No", "No", "Yes", "Yes", "Yes", "Yes"]
-# })
+# Column names
+columns = ["Study Hours", "Attendance", "Sleep Quality", "Part-time Job", "Pass/Fail"]
 
-# -----------------------------
-# 2. Select input and output
-# -----------------------------
-# Change this according to your dataset
-target_column = "Purchased"
+# Create DataFrame
+df = pd.DataFrame(data, columns=columns)
 
-X = data.drop(target_column, axis=1)
-y = data[target_column]
+# Save as Excel file
+df.to_excel("student_data.xlsx", index=False)
 
-# -----------------------------
-# 3. Convert categorical data into numbers
-# -----------------------------
-X = pd.get_dummies(X)
+print("Excel file created successfully!")
 
-# If target column is text, convert it into numbers
-if y.dtype == "object":
-    y = pd.factorize(y)[0]
+# ═══════════════════════════════════════════════════════
+# FILE DETAILS
+# ═══════════════════════════════════════════════════════
+FILE_PATH = "student_data.xlsx"
+TARGET_COLUMN = "Pass/Fail"
 
-# -----------------------------
-# 4. Split data into training and testing
-# -----------------------------
+# ─────────────────────────────────────────
+# 1. LOAD DATASET
+# ─────────────────────────────────────────
+if FILE_PATH.endswith(".csv"):
+    df = pd.read_csv(FILE_PATH)
+else:
+    df = pd.read_excel(FILE_PATH)
+
+# Remove extra spaces from column names
+df.columns = df.columns.str.strip()
+
+print("✅ Dataset loaded!")
+print("Shape :", df.shape)
+print("Columns :", list(df.columns))
+print(df.head())
+
+# ─────────────────────────────────────────
+# 2. REMOVE MISSING VALUES
+# ─────────────────────────────────────────
+df = df.dropna()
+
+# ─────────────────────────────────────────
+# 3. SPLIT FEATURES & TARGET
+# ─────────────────────────────────────────
+X = df.drop(columns=[TARGET_COLUMN])
+y = df[TARGET_COLUMN]
+
+# ─────────────────────────────────────────
+# 4. ENCODE TARGET
+# ─────────────────────────────────────────
+le_target = LabelEncoder()
+y_encoded = le_target.fit_transform(y)
+
+classes = le_target.classes_
+n_classes = len(classes)
+
+print("\n🎯 Classes :", classes)
+
+# ─────────────────────────────────────────
+# 5. DETECT COLUMN TYPES
+# ─────────────────────────────────────────
+numeric_cols = X.select_dtypes(include=["number"]).columns.tolist()
+categorical_cols = X.select_dtypes(include=["object"]).columns.tolist()
+
+print("\n🔢 Numeric Columns :", numeric_cols)
+print("🔤 Categorical Columns :", categorical_cols)
+
+# ─────────────────────────────────────────
+# 6. ENCODE CATEGORICAL FEATURES
+# ─────────────────────────────────────────
+X_processed = X.copy()
+
+oe = OrdinalEncoder()
+X_processed[categorical_cols] = oe.fit_transform(X[categorical_cols])
+
+X_processed = X_processed.astype(float)
+
+# ─────────────────────────────────────────
+# 7. SELECT MODEL
+# ─────────────────────────────────────────
+if categorical_cols and not numeric_cols:
+    model = CategoricalNB()
+    model_name = "CategoricalNB"
+else:
+    model = GaussianNB()
+    model_name = "GaussianNB"
+
+print(f"\n🤖 Model Selected : {model_name}")
+
+# ─────────────────────────────────────────
+# 8. TRAIN TEST SPLIT
+# ─────────────────────────────────────────
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y,
-    test_size=0.2,
+    X_processed,
+    y_encoded,
+    test_size=0.33,
     random_state=42
 )
 
-# -----------------------------
-# 5. Create and train Decision Tree model
-# -----------------------------
-model = DecisionTreeClassifier(
-    criterion="gini",      # or "entropy"
-    max_depth=3,           # change or remove if needed
-    random_state=42
-)
+print(f"\n📊 Train Size : {len(X_train)}")
+print(f"📊 Test Size  : {len(X_test)}")
 
+# ─────────────────────────────────────────
+# 9. TRAIN MODEL
+# ─────────────────────────────────────────
 model.fit(X_train, y_train)
 
-# -----------------------------
-# 6. Make predictions
-# -----------------------------
+# ─────────────────────────────────────────
+# 10. PREDICTIONS
+# ─────────────────────────────────────────
 y_pred = model.predict(X_test)
+y_prob = model.predict_proba(X_test)
 
-# -----------------------------
-# 7. Evaluate model
-# -----------------------------
-print("Accuracy:", accuracy_score(y_test, y_pred))
-print("\nConfusion Matrix:\n", confusion_matrix(y_test, y_pred))
-print("\nClassification Report:\n", classification_report(y_test, y_pred))
+# ─────────────────────────────────────────
+# 11. ACCURACY
+# ─────────────────────────────────────────
+acc = accuracy_score(y_test, y_pred)
 
-# -----------------------------
-# 8. Visualize Decision Tree
-# -----------------------------
-plt.figure(figsize=(15, 8))
-plot_tree(
-    model,
-    feature_names=X.columns,
-    class_names=True,
-    filled=True
+print(f"\n✅ Accuracy : {round(acc, 4)}")
+
+# ─────────────────────────────────────────
+# 12. CLASSIFICATION REPORT
+# ─────────────────────────────────────────
+print("\n📋 Classification Report:\n")
+
+print(
+    classification_report(
+        y_test,
+        y_pred,
+        target_names=classes,
+        zero_division=0
+    )
 )
+
+# ─────────────────────────────────────────
+# 13. CONFUSION MATRIX
+# ─────────────────────────────────────────
+cm = confusion_matrix(y_test, y_pred)
+
+plt.figure(figsize=(5, 4))
+
+sns.heatmap(
+    cm,
+    annot=True,
+    fmt='d',
+    cmap='Blues',
+    xticklabels=classes,
+    yticklabels=classes
+)
+
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.title(f"Confusion Matrix - {model_name}")
+
+plt.tight_layout()
+
+plt.savefig("confusion_matrix.png")
+
 plt.show()
 
-'''To edit it for your question, mainly change:
-data = pd.read_csv("your_dataset.csv") , target_column = "Purchased"
-For example, if your output column is Result, write:
-target_column = "Result" '''
+print("💾 Confusion matrix saved!")
+
+# ─────────────────────────────────────────
+# 14. AUC ROC SCORE
+# ─────────────────────────────────────────
+try:
+    if n_classes == 2:
+        auc = roc_auc_score(y_test, y_prob[:, 1])
+        print(f"\n📈 AUC ROC Score : {round(auc, 4)}")
+
+except Exception as e:
+    print("\n⚠️ AUC skipped :", e)
+
+# ─────────────────────────────────────────
+# 15. CROSS VALIDATION
+# ─────────────────────────────────────────
+cv_scores = cross_val_score(
+    model,
+    X_processed,
+    y_encoded,
+    cv=3,
+    scoring='accuracy'
+)
+
+print("\n🔁 Cross Validation Scores :")
+print(cv_scores)
+
+print("\nMean Accuracy :", round(cv_scores.mean(), 4))
+
+# ─────────────────────────────────────────
+# 16. NEW SAMPLE PREDICTION
+# ─────────────────────────────────────────
+# ─────────────────────────────────────────
+# 16. NEW SAMPLE PREDICTION
+# ─────────────────────────────────────────
+print("\n" + "=" * 50)
+print("🔮 PREDICT NEW SAMPLE")
+print("=" * 50)
+
+new_sample = {}
+
+for col in X.columns:
+
+    val = input(f"{col}: ").strip()
+
+    # Convert numeric columns to float
+    if col in numeric_cols:
+        val = float(val)
+
+    new_sample[col] = val
+
+new_df = pd.DataFrame([new_sample])
+
+# Encode only categorical columns
+new_df[categorical_cols] = oe.transform(
+    new_df[categorical_cols]
+)
+
+new_df = new_df.astype(float)
+
+prediction = model.predict(new_df)
+
+predicted_class = le_target.inverse_transform(prediction)[0]
+
+probabilities = model.predict_proba(new_df)[0]
+
+print(f"\n✅ Predicted Class : {predicted_class}")
+
+print("\n📊 Probabilities :")
+
+for cls, prob in zip(classes, probabilities):
+    print(f"{cls} : {round(prob, 4)}")
+------------------------------------------------------------------------
